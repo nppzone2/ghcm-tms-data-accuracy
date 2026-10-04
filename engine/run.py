@@ -56,6 +56,18 @@ def month_of(tms_path):
         sys.exit(f'LỖI: file {tms_path.name} không có cột Date.')
     return to_dt(d['Date']).dt.strftime('%Y-%m').mode().iloc[0]
 
+def fill_month_of(path):
+    """Tháng của file Fill Rate: YYYYMM trong tên file, nếu không có thì cột Calendar_Month."""
+    hit = re.search(r'(20\d{2})[-_]?(0[1-9]|1[0-2])(?!\d)', path.stem)
+    if hit:
+        return f'{hit.group(1)}-{hit.group(2)}'
+    from xlio import read_export
+    d = read_export(path, usecols=lambda c: str(c).strip() == 'Calendar_Month')
+    if 'Calendar_Month' not in d.columns:
+        sys.exit(f'LỖI: không xác định được tháng của {path.name} (đặt tên dạng Fill_Rate_YYYYMM.xlsx).')
+    v = str(int(float(d.Calendar_Month.dropna().mode().iloc[0])))
+    return f'{v[:4]}-{v[4:6]}'
+
 def unpack(data, dest):
     dest.mkdir(parents=True, exist_ok=True)
     zipfile.ZipFile(io.BytesIO(data)).extractall(dest)
@@ -78,16 +90,32 @@ def prepare():
                 tmp.rename(WORK / m); changed.add(m); print(f'Chuyển dữ liệu cũ sang tháng {m}')
         shutil.rmtree(tmp, ignore_errors=True)
     # 2. file mới tải lên
+    # Nhận được nhiều tháng trong một lần: ghép file TMS và Fill Rate theo tháng.
     new = [p for p in INPUT.glob('*.xlsx') if not p.name.startswith('~$')]
     if new:
         t = [p for p in new if is_tms(p)]; f = [p for p in new if is_fill(p)]
-        if len(t) != 1 or len(f) != 1:
-            sys.exit(f'LỖI: thư mục input/ cần đúng 1 file TMS và 1 file Fill Rate, đang có: {[p.name for p in new]}')
-        m = month_of(t[0])
-        dest = WORK / m
-        shutil.rmtree(dest, ignore_errors=True); dest.mkdir(parents=True)
-        for p in (t[0], f[0]): shutil.copy2(p, dest / p.name)
-        changed.add(m); print(f'Nhận dữ liệu mới cho tháng {m}: {t[0].name}, {f[0].name}')
+        other = [p.name for p in new if p not in t and p not in f]
+        if other:
+            print(f'Cảnh báo: bỏ qua file không nhận ra (tên cần có chữ TMS hoặc Fill): {other}')
+        if not t or not f:
+            sys.exit(f'LỖI: cần cả file TMS và file Fill Rate của cùng tháng, đang có: {[p.name for p in new]}')
+        tm = {}
+        for p in t:
+            m = month_of(p)
+            if m in tm: sys.exit(f'LỖI: có 2 file TMS cùng tháng {m}: {tm[m].name}, {p.name}')
+            tm[m] = p
+        fm = {}
+        for p in f:
+            m = fill_month_of(p)
+            if m in fm: sys.exit(f'LỖI: có 2 file Fill Rate cùng tháng {m}: {fm[m].name}, {p.name}')
+            fm[m] = p
+        if set(tm) != set(fm):
+            sys.exit(f'LỖI: file TMS và Fill Rate không khớp tháng. TMS: {sorted(tm)}, Fill Rate: {sorted(fm)}')
+        for m in sorted(tm):
+            dest = WORK / m
+            shutil.rmtree(dest, ignore_errors=True); dest.mkdir(parents=True)
+            for p in (tm[m], fm[m]): shutil.copy2(p, dest / p.name)
+            changed.add(m); print(f'Nhận dữ liệu mới cho tháng {m}: {tm[m].name}, {fm[m].name}')
     months = sorted(p.name for p in WORK.iterdir() if p.is_dir() and re.fullmatch(r'\d{4}-\d{2}', p.name))
     if not months:
         sys.exit('LỖI: chưa có dữ liệu. Hãy tải 2 file TMS Order Detail và Fill Rate vào input/.')

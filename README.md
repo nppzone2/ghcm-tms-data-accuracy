@@ -11,7 +11,7 @@ Dashboard KPI Data Accuracy cho toàn **Greater HCM**: 6 vùng (HCM Zone 1–5, 
 3. Bấm **Commit changes**. Khoảng 3–5 phút sau trang tự cập nhật (dấu ✓ xanh ở tab **Actions**).
 
 - Workflow tự nhận tháng từ cột `Date` của file TMS và tự dò dòng tiêu đề (file Power BI có 1–3 dòng "Applied filters" phía trên).
-- Mỗi lần chỉ tải 2 file của **một** tháng. Nạp nhiều tháng: tải lần lượt, đợi lần trước chạy xong.
+- Có thể tải nhiều tháng cùng lúc (mỗi tháng 1 file TMS + 1 file Fill Rate, tên file có `YYYYMM`); workflow tự ghép theo tháng. Nạp 3 tháng mất khoảng 5 phút.
 - Tải lại giữa tháng thì dữ liệu tháng đó được thay bằng file mới; tháng cũ vẫn được giữ.
 - Trang hiển thị **3 tháng đã hoàn thành gần nhất + tháng đang chạy**; tab **3 tháng** chỉ tổng hợp các tháng đã hoàn thành. Trang tự dựng lại lúc 10:00 mỗi ngày.
 - GitHub giới hạn **25 MB/file** khi tải qua web. File TMS lớn hơn: xoá bớt cột không dùng (`Picked_LatLong`, `BI_Calculated_Distance`, `distance_drop_drop`, `new_geocompliant`…) trước khi tải.
