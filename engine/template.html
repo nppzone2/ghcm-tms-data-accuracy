@@ -838,8 +838,8 @@ function fillScope(){
     : `<option value="${esc(role)}">${esc(role.slice(2))}</option>`;
   $('#region').value=regSel; $('#region').disabled=role!=='admin';
   /* NPP theo Region */
-  const opt=n=>`<option value="${n}">${n}${DATA.npp_info[n]&&DATA.npp_info[n].name!==n?' · '+esc(DATA.npp_info[n].name).slice(0,28):''}</option>`;
-  let h=`<option value="${esc(regSel)}">Tổng ${esc(regSel==='ALL'?'Greater HCM':regSel.slice(2))}</option>`;
+  const opt=n=>`<option value="${n}">${n}</option>`;
+  let h=`<option value="${esc(regSel)}">${esc(regSel==='ALL'?'Greater HCM':regSel.slice(2))}</option>`;
   if(regSel==='ALL') h+=R.length>1?R.map(r=>`<optgroup label="${esc(r)}">${NPPS.filter(n=>regOf(n)===r).map(opt).join('')}</optgroup>`).join(''):NPPS.map(opt).join('');
   else h+=NPPS.filter(n=>regOf(n)===regSel.slice(2)).map(opt).join('');
   $('#scope').innerHTML=h;
