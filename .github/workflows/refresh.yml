@@ -1,0 +1,82 @@
+name: Cập nhật dashboard GHCM
+
+# Chạy khi có file mới trong input/, khi sửa engine/ (giao diện, logic), hoặc bấm "Run workflow" trong tab Actions.
+on:
+  push:
+    branches: [main]
+    paths: ['input/**.xlsx', 'engine/**']
+  workflow_dispatch:
+  # Dựng lại mỗi ngày lúc 10:00 giờ Việt Nam (03:00 UTC).
+  schedule:
+    - cron: '0 3 * * *'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: refresh-ghcm-dashboard
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Cài thư viện
+        run: pip install -r requirements.txt
+
+      - name: Nhận dữ liệu theo tháng và tính KPI
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: python engine/run.py prepare
+
+      - name: Dựng trang đã mã hoá
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          NPP_PASSWORD: ${{ secrets.NPP_PASSWORD }}
+          NPP_PASSWORDS: ${{ secrets.NPP_PASSWORDS }}
+          REGION_PASSWORD: ${{ secrets.REGION_PASSWORD }}
+          REGION_PASSWORDS: ${{ secrets.REGION_PASSWORDS }}
+        run: python engine/build_site.py
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      # Lưu kho dữ liệu mã hoá theo tháng (input/vault/YYYY-MM.enc) để giữ lịch sử và dựng lại khi sửa giao diện.
+      # Repo công khai: xoá file Excel thô khỏi input/ để người ngoài không tải được dữ liệu gốc.
+      - name: Lưu kho mã hoá, xoá file thô
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          IS_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          python engine/run.py save
+          git config user.name "GHCM TMS Dashboard Bot"
+          git config user.email "actions@github.com"
+          git add -A input/vault
+          git rm -q --cached --ignore-unmatch input/last_data.enc
+          if [ "$IS_PRIVATE" != "true" ]; then git rm -q --cached --ignore-unmatch input/*.xlsx; fi
+          if ! git diff --cached --quiet; then
+            git commit -m "Cập nhật kho dữ liệu mã hoá [skip ci]"
+            git pull --rebase -q origin main
+            git push
+          fi
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
