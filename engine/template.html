@@ -240,7 +240,8 @@ tr.tot th,tr.tot td{background:var(--sunk);font-weight:600}
       <div class="tools">
         <label class="who" for="scope" id="who"></label>
         <select id="month" aria-label="Chọn tháng"></select>
-        <select id="scope" hidden aria-label="Chọn Vùng hoặc NPP"></select>
+        <select id="region" hidden aria-label="Chọn Region"></select>
+        <select id="scope" hidden aria-label="Chọn NPP"></select>
         <button class="btn sm" id="theme" type="button" aria-pressed="false">Sáng / Tối</button>
         <button class="btn sm" id="logout" type="button">Đăng xuất</button>
       </div>
@@ -305,7 +306,7 @@ const n1=(v,d=1)=>v==null?'—':Number(v).toLocaleString('vi-VN',{maximumFractio
 const T_PLAN=Math.round(TH.plan_err_pct*100), T_TOL=Math.round(TH.npp_plan_tol*100);
 const T_DT=TH.dt_month_pct*100, T_PL=TH.payload_tol*100;
 
-let role=null, scope='ALL', page='overview', kpiSel='payload';
+let role=null, scope='ALL', regSel='ALL', page='overview', kpiSel='payload';
 let EF={q:'',type:'',day:'',npp:'',pf:false}, epage=1;
 const isAdmin=()=>role==='admin';
 /* Phạm vi xem: 'ALL' toàn GHCM · 'R:<Vùng>' một vùng · mã NPP */
@@ -318,7 +319,7 @@ const inScope=n=>scope==='ALL'||(isReg(scope)?regOf(n)===scope.slice(2):n===scop
 const VIS=()=>DATA.scorecard.filter(x=>inScope(x.npp));
 const curS=()=>scope==='ALL'?DATA.total:isReg(scope)?(DATA.regions[scope.slice(2)]||DATA.total):SC[scope];
 const rowsIn=arr=>scope==='ALL'?arr:arr.filter(r=>inScope(r.npp??r.TenantName));
-const scopeLbl=()=>scope==='ALL'?'Toàn GHCM':isReg(scope)?'Vùng '+scope.slice(2):'NPP '+scope;
+const scopeLbl=()=>scope==='ALL'?'Greater HCM':isReg(scope)?'Vùng '+scope.slice(2):'NPP '+scope;
 
 /* ---------------- biểu đồ ---------------- */
 function hbar(items,{thr=null,max=null,fmtv=v=>pc(v),neutral=0}={}){
@@ -446,7 +447,7 @@ function regionTable(){
   const bar=(k,n,trk)=>{const f=n?k/n:0;return `<td class="n"><div class="ratio" style="margin-left:auto"><span>${k}/${n}</span><div class="meter"><b style="width:${f*100}%;background:${f===1?'var(--good)':trk?'var(--warn)':f>=.5?'var(--warn)':'var(--crit)'}"></b></div></div></td>`;};
   const rows=R.map(r=>{const x=DATA.regions[r];return `<tr class="click" data-npp="R:${esc(r)}"><th scope="row">${esc(r)}</th>${bar(x.npp_pass,x.npp_n)}${bar(x.pass_v_payload,x.npp_n)}${bar(x.pass_v_dt,x.npp_n)}${bar(x.pass_v_created,x.npp_n)}${bar(x.pass_v_username,x.npp_n)}<td class="n">${fmt(x.orders)}</td><td class="n">${fmt(x.plans)}</td><td class="n ${x.v_ontime==='PASS'?'':'cwarn'}">${pc(x.ot_pct,1)}</td><td class="n ${x.v_24==='PASS'?'':'cwarn'}">${pc(x.t24_pct,1)}</td></tr>`;});
   const t=DATA.total, np=DATA.scorecard.filter(x=>x.overall==='PASS').length, cnt=k=>DATA.scorecard.filter(x=>x[k]==='PASS').length, n=DATA.scorecard.length;
-  rows.push(`<tr class="tot"><th scope="row">Toàn GHCM</th>${bar(np,n)}${bar(cnt('v_payload'),n)}${bar(cnt('v_dt'),n)}${bar(cnt('v_created'),n)}${bar(cnt('v_username'),n)}<td class="n">${fmt(t.orders)}</td><td class="n">${fmt(t.plans)}</td><td class="n">${pc(t.ot_pct,1)}</td><td class="n">${pc(t.t24_pct,1)}</td></tr>`);
+  rows.push(`<tr class="tot"><th scope="row">Greater HCM</th>${bar(np,n)}${bar(cnt('v_payload'),n)}${bar(cnt('v_dt'),n)}${bar(cnt('v_created'),n)}${bar(cnt('v_username'),n)}<td class="n">${fmt(t.orders)}</td><td class="n">${fmt(t.plans)}</td><td class="n">${pc(t.ot_pct,1)}</td><td class="n">${pc(t.t24_pct,1)}</td></tr>`);
   return `<section class="card"><div class="ch"><div><h2>Kết quả theo Vùng</h2><p class="sub">Số NPP đạt trên tổng NPP của vùng, theo kết quả tháng và từng tiêu chí. Bấm một vùng để xem riêng.</p></div></div>${
     table([['Vùng'],['NPP đạt','n'],['Payload','n'],['D&T','n'],['Created Date','n'],['User name','n'],['Đơn','n'],['Chuyến','n'],['On time','n'],['24H','n']],rows)}</section>`;
 }
@@ -792,6 +793,8 @@ function setScope(n){if(!canMulti())return;
   if(isReg(role)&&isReg(n)&&n!==role) return;
   if(isReg(n)&&!(DATA.regions||{})[n.slice(2)]) return;
   if(n!=='ALL'&&!isReg(n)&&!NPPS.includes(n)){const m=ORDER.slice().reverse().find(x=>BUNDLE.months[x].npps.includes(n)); if(!m) return; loadMonth(m);$('#month').value=m;}
+  if(n==='ALL'||isReg(n)) regSel=n;
+  else if(regSel!=='ALL'&&regOf(n)!==regSel.slice(2)) regSel='R:'+regOf(n);   // NPP ngoài Region đang chọn: chuyển Region theo NPP
   scope=n;fillScope();EF.npp='';epage=1;render();}
 const reset=o=>Object.assign({q:'',type:'',day:'',npp:'',pf:false},o);
 function wire(){
@@ -819,17 +822,26 @@ function wire(){
 }
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b) go(b.dataset.p);});
 $('#scope').addEventListener('change',e=>setScope(e.target.value));
+$('#region').addEventListener('change',e=>setScope(e.target.value));   // đổi Region: về dòng tổng của Region đó
+/* Hai bộ lọc phụ thuộc nhau: Region (Greater HCM + từng vùng) → NPP (dòng tổng của Region + các NPP thuộc Region). */
 function fillScope(){
   if(!canMulti()) return;
   const top=role==='admin'?'ALL':role;
   if(isNpp()&&!NPPS.includes(scope)) scope=top;
   if(isReg(scope)&&!(DATA.regions||{})[scope.slice(2)]) scope=top;
-  const opt=n=>`<option value="${n}">NPP ${n}${DATA.npp_info[n]&&DATA.npp_info[n].name!==n?' · '+esc(DATA.npp_info[n].name).slice(0,28):''}</option>`;
-  let h=role==='admin'?`<option value="ALL">Toàn GHCM</option>`:`<option value="${esc(role)}">Toàn vùng ${esc(role.slice(2))}</option>`;
+  if(isReg(regSel)&&!(DATA.regions||{})[regSel.slice(2)]) regSel=top;
+  if(isReg(role)) regSel=role;
   const R=REGS();
-  if(role==='admin'&&R.length) h+=`<optgroup label="Vùng">${R.map(r=>`<option value="R:${esc(r)}">Vùng ${esc(r)}</option>`).join('')}</optgroup>`;
-  if(R.length>1) h+=R.map(r=>`<optgroup label="NPP · ${esc(r)}">${NPPS.filter(n=>regOf(n)===r).map(opt).join('')}</optgroup>`).join('');
-  else h+=NPPS.map(opt).join('');
+  /* Region */
+  $('#region').innerHTML=role==='admin'
+    ? `<option value="ALL">Greater HCM</option>`+R.map(r=>`<option value="R:${esc(r)}">${esc(r)}</option>`).join('')
+    : `<option value="${esc(role)}">${esc(role.slice(2))}</option>`;
+  $('#region').value=regSel; $('#region').disabled=role!=='admin';
+  /* NPP theo Region */
+  const opt=n=>`<option value="${n}">${n}${DATA.npp_info[n]&&DATA.npp_info[n].name!==n?' · '+esc(DATA.npp_info[n].name).slice(0,28):''}</option>`;
+  let h=`<option value="${esc(regSel)}">Tổng ${esc(regSel==='ALL'?'Greater HCM':regSel.slice(2))}</option>`;
+  if(regSel==='ALL') h+=R.length>1?R.map(r=>`<optgroup label="${esc(r)}">${NPPS.filter(n=>regOf(n)===r).map(opt).join('')}</optgroup>`).join(''):NPPS.map(opt).join('');
+  else h+=NPPS.filter(n=>regOf(n)===regSel.slice(2)).map(opt).join('');
   $('#scope').innerHTML=h;
   $('#scope').value=scope;
 }
@@ -843,9 +855,9 @@ $('#theme').addEventListener('click',()=>{const r=document.documentElement;
 
 /* ---------------- vào ứng dụng ---------------- */
 $('#foot').textContent=`RTC · Future-Fit · HEINEKEN EverGreen 2030 · Greater HCM — Nguồn: ${DATA.meta.src} · Cập nhật ${DATA.meta.built}`;
-role=LOGIN_ROLE;scope=role==='admin'?'ALL':role;
+role=LOGIN_ROLE;scope=role==='admin'?'ALL':role;regSel=scope;
 $('#who').textContent=role==='admin'?'Admin':isReg(role)?'Vùng '+role.slice(2):'NPP '+role;
-const sel=$('#scope');sel.hidden=!canMulti();
+const sel=$('#scope');sel.hidden=!canMulti();$('#region').hidden=!canMulti();
 fillScope();
 $('#login').hidden=true;$('#app').hidden=false;
 const want=(location.hash||'').slice(1);
